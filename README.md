@@ -1,163 +1,96 @@
-[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/_sZciJPS)
-
-# sii-project-template
-
-## ОПИСАНИЕ ПРОЕКТА
-
-Умный планировщик питания, который создаёт персональные недельные меню на основе ваших целей (похудение, набор массы, здоровое питание), бюджета и предпочтений. AI анализирует пищевую ценность, оптимизирует по калориям и стоимости, предлагает рецепты из доступных продуктов и генерирует список покупок. Помогает питаться разнообразно, полезно и экономно.
-
-## ЦЕЛЬ ПРОЕКТА
-
-Упростить планирование здорового питания и помочь людям достигать целей через персонализированные планы питания.
-
-## ФУНКЦИОНАЛЬНОСТЬ
-
-Создание персональных планов питания с помощью LLM
-
-Оптимизация по калориям, БЖУ и бюджету
-
-Генерация списков покупок и расчёт стоимости
-
-Подбор рецептов из доступных продуктов
-
-Учёт диетических ограничений и аллергий
-
-Интеграция с базами пищевой ценности продуктов
-
 # AI Meal Planner
 
-**AI Meal Planner** — это веб-приложение для автоматического создания персонализированных планов питания с помощью языковых моделей (LLM). Пользователи могут указать свои цели (похудение, набор массы), бюджет, калорийность, предпочтения в еде и аллергии, а система сгенерирует подробный план на неделю.
+Веб-приложение для автоматического создания персонализированных планов питания с помощью языковых моделей (LLM). Пользователь указывает цель (похудение, набор массы, здоровое питание), бюджет, калорийность, предпочтения, аллергии и диетические ограничения — система генерирует подробный план на неделю, считает БЖУ и стоимость, подбирает рецепты и формирует список покупок.
 
-![Пример интерфейса](https://via.placeholder.com/1200x600.png?text=AI+Meal+Planner+Interface)
+## Основные возможности
 
-## 🌟 Основные возможности
+- **Генерация планов питания** — создание недельного плана по целям, калориям, бюджету и предпочтениям через LLM (OpenAI / OpenRouter, есть мок-режим без ключа).
+- **Асинхронная генерация** — план готовится в фоне (`pending` → `generating` → `ready` / `error`), фронтенд опрашивает статус.
+- **Замена блюд** — для любого блюда можно запросить альтернативы от LLM и сохранить понравившуюся.
+- **Список покупок** — автогенерация из плана, с категориями и примерными ценами.
+- **Аутентификация** — регистрация и вход по JWT.
 
-- **Генерация планов питания**: Создание планов на основе целей, калорий, бюджета и предпочтений пользователя.
-- **Асинхронная работа**: План генерируется в фоновом режиме, не заставляя пользователя ждать. Фронтенд автоматически обновляется по готовности.
-- **Замена блюд**: Не нравится блюдо? Замените его на одну из предложенных LLM альтернатив.
-- **Список покупок**: Автоматическая генерация списка покупок на основе сгенерированного плана, с категориями и примерными ценами.
-- **Аутентификация**: Регистрация и вход пользователей с использованием JWT.
-- **Современный стек**: FastAPI на бэкенде и React/Vite/TypeScript на фронтенде.
+## Стек
 
----
+**Backend** (`backend/`): FastAPI, PostgreSQL + SQLAlchemy (async), Alembic, JWT (`python-jose` + `passlib`), `httpx` + `openai` для LLM, `pydantic-settings`. Пакеты — `uv`/`pip`, `requirements.txt`.
 
-## 🛠️ Технологии
+**Frontend** (`frontend/`): React 19 + TypeScript, Vite 6, маршрутизация на хешах, компоненты `auth / layout / dashboard / plans` (`AuthForm`, `Sidebar`, `Header`, `Dashboard`, `CreatePlanForm`, `PlanList`, `PlanDetail`).
 
-### Backend
+**Прочее**: `api/` — черновики/пробы API, `database/` — SQL-наброски схемы, `docs/` — спеки (`api-spec.md`, `database.md`, `ui-components.md`, `use-case.md`, `ux-scenarios.md`), `design/` — макеты, `utils/` — вспомогательные скрипты.
 
-- **Фреймворк**: [FastAPI](https://fastapi.tiangolo.com/)
-- **База данных**: [PostgreSQL](https://www.postgresql.org/)
-- **ORM**: [SQLAlchemy](https://www.sqlalchemy.org/) (с асинхронной поддержкой)
-- **Миграции**: [Alembic](https://alembic.sqlalchemy.org/en/latest/)
-- **Аутентификация**: [JWT](https://jwt.io/) (`python-jose`)
-- **LLM-интеграция**: [OpenAI](https://openai.com/) (через [OpenRouter](https://openrouter.ai/))
-- **Менеджер пакетов**: [uv](https://github.com/astral-sh/uv)
+## Структура
 
-### Frontend
+```
+backend/app/
+  main.py            # FastAPI app, CORS, подключение роутеров
+  config.py          # pydantic-settings (.env)
+  database.py        # async engine/session
+  models.py / schemas.py
+  routers/auth.py    # регистрация, логин (JWT)
+  routers/plans.py   # CRUD планов, статус генерации
+  routers/meals.py   # замена/обновление блюд, список покупок
+  routers/llm.py     # проверка LLM
+  services/llm_service.py
+frontend/
+  App.tsx            # hash-роутер, layout
+  components/        # auth, layout, dashboard, plans
+  services/          # api-клиент
+  constants.ts / types.ts
+```
 
-- **Фреймворк**: [React](https://react.dev/)
-- **Язык**: [TypeScript](https://www.typescriptlang.org/)
-- **Сборщик**: [Vite](https://vitejs.dev/)
-- **Стилизация**: [Tailwind CSS](https://tailwindcss.com/) (предположительно, судя по классам)
+## API (кратко)
 
----
+- `POST /auth/register` — регистрация
+- `POST /auth/login` — вход, выдача JWT
+- `GET /plans` — все планы пользователя
+- `POST /plans` — создать план (запуск фоновой генерации)
+- `GET /plans/{plan_id}` — конкретный план
+- `GET /plans/{plan_id}/status` — статус генерации
+- `POST /meals/{plan_id}/replace` — альтернативы для блюда
+- `PATCH /meals/{meal_id}` — сохранить замену
+- `POST /meals/{plan_id}/shopping-list/generate` — список покупок
 
-## 🚀 Установка и запуск
+Полная интерактивная документация: `http://127.0.0.1:8000/docs` при запущенном бэкенде.
 
-### Требования
+## Запуск
 
-- [Python](https://www.python.org/) 3.12+
-- [uv](https://github.com/astral-sh/uv) (менеджер пакетов Python)
-- [Node.js](https://nodejs.org/) 18+ и [npm](https://www.npmjs.com/)
-- Запущенный экземпляр PostgreSQL
+Требования: Python 3.12+, Node.js 18+, запущенный PostgreSQL.
 
-### 1. Настройка Backend
+### 1. Backend
 
-1.  **Перейдите в директорию бэкенда:**
+```bash
+cd backend
 
-    ```bash
-    cd backend
-    ```
+# окружение (uv или venv)
+uv venv
+uv pip install -r requirements.txt
+# либо: python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt
 
-2.  **Создайте виртуальное окружение и установите зависимости с помощью `uv`:**
+# конфиг — создать backend/.env:
+# DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/db_name"
+# SECRET_KEY="your_strong_secret_key"
+# ALGORITHM="HS256"
+# OPENAI_API_KEY="..."  # опционально (OpenRouter/OpenAI), без него — мок-данные
+# OPENAI_BASE_URL="https://openrouter.ai/api/v1"  # опционально
 
-    ```bash
-    uv venv init
-    uv add -r requirements.txt
-    ```
+alembic upgrade head
+uv run uvicorn app.main:app --reload
+```
 
-    _Если вы не используете `uv`, можно использовать `pip`:_
+Сервер: `http://127.0.0.1:8000`.
 
-    ```bash
-    # python -m venv venv
-    # source venv/bin/activate
-    # pip install -r requirements.txt
-    ```
+### 2. Frontend
 
-3.  **Создайте файл `.env`** в директории `backend` по примеру `backend/.env.example` (если он есть) или со следующими переменными:
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-    ```env
-    # URL для подключения к вашей базе данных PostgreSQL
-    DATABASE_URL="postgresql+asyncpg://user:password@localhost:5432/db_name"
+Приложение: адрес из вывода Vite (обычно `http://localhost:5173`).
 
-    # Секретный ключ для генерации JWT токенов
-    SECRET_KEY="your_strong_secret_key"
+## Заметки
 
-    # Алгоритм подписи токена
-    ALGORITHM="HS256"
-
-    # (Опционально) API-ключ для OpenRouter.ai или OpenAI
-    # Если не указан, приложение будет использовать мок-данные
-    OPENAI_API_KEY="your_openai_or_openrouter_api_key"
-    ```
-
-4.  **Примените миграции базы данных:**
-
-    ```bash
-    # Убедитесь, что ваше виртуальное окружение активировано
-    alembic upgrade head
-    ```
-
-5.  **Запустите сервер:**
-    ```bash
-    uv run uvicorn app.main:app --reload
-    ```
-    Сервер будет доступен по адресу `http://127.0.0.1:8000`.
-
-### 2. Настройка Frontend
-
-1.  **Перейдите в директорию фронтенда:**
-
-    ```bash
-    cd frontend
-    ```
-
-2.  **Установите зависимости:**
-
-    ```bash
-    npm install
-    ```
-
-3.  **Запустите dev-сервер:**
-    ```bash
-    npm run dev
-    ```
-    Приложение будет доступно по адресу `http://localhost:3000` (или другому порту, указанному Vite).
-
----
-
-## API Эндпоинты
-
-Краткий обзор основных эндпоинтов. Подробности смотрите в коде роутеров.
-
-- `POST /auth/register` - Регистрация нового пользователя.
-- `POST /auth/login` - Вход и получение JWT токена.
-- `GET /plans` - Получить все планы питания пользователя.
-- `POST /plans` - Создать новый план (запускает фоновую генерацию).
-- `GET /plans/{plan_id}` - Получить конкретный план.
-- `GET /plans/{plan_id}/status` - Проверить статус генерации плана.
-- `POST /meals/{plan_id}/replace` - Запросить замену для блюда.
-- `PATCH /meals/{meal_id}` - Обновить блюдо (сохранить замену).
-- `POST /meals/{plan_id}/shopping-list/generate` - Сгенерировать список покупок.
-
-Документация API доступна по адресу `http://127.0.0.1:8000/docs` при запущенном бэкенд-сервере.
+- `backend/.env` с секретами не коммитится (см. `.gitignore`).
+- Без `OPENAI_API_KEY` приложение работает на мок-данных — удобно для локальной разработки без трат на LLM.
+- CORS по умолчанию открыт для локального фронтенда; перед деплоем ограничить origins в `backend/app/main.py`.

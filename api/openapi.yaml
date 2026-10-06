@@ -1,226 +1,887 @@
 openapi: 3.0.3
 info:
-  title: AI Meal Planner API
+  title: 🍽️ AI Meal Planner API
   version: 1.0.0
-  description: API для управления планами питания и взаимодействия с LLM
+  description: |
+    # API для управления планами питания с использованием LLM
+
+    ## Возможности
+
+    - **🔐 Аутентификация**: Регистрация и вход с JWT токенами
+    - **📋 Планы питания**: Создание и управление планами через LLM
+    - **🍽️ Блюда**: Просмотр и замена блюд с помощью ИИ
+    - **🛒 Списки покупок**: Автоматическая генерация списка продуктов
+    - **🤖 LLM интеграция**: Логирование запросов к языковой модели
+
+    ## Статусы генерации
+
+    Планы и списки покупок могут иметь следующие статусы:
+    - `pending`: Ожидает начала генерации
+    - `generating`: Идёт генерация через LLM
+    - `ready`: Генерация завершена успешно
+    - `error`: Произошла ошибка
+
+    ## Аутентификация
+
+    Все эндпоинты (кроме `/health` и `/auth/*`) требуют Bearer токен:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+  contact:
+    name: AI Meal Planner Team
+    email: support@aimealplanner.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
 servers:
-  - url: https://api.aimealplanner.com/v1
-    description: Production server
+  - url: http://localhost:8000
+    description: Локальный сервер разработки
+  - url: https://api.aimealplanner.com
+    description: Production сервер
 
 security:
-  - bearerAuth: []
+  - BearerAuth: []
 
 components:
   securitySchemes:
-    bearerAuth:
+    BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: JWT токен, полученный после входа (/auth/login)
 
   schemas:
-    User:
+    # =========================================================================
+    # Auth Schemas
+    # =========================================================================
+    
+    UserCreate:
       type: object
+      required: [email, password]
       properties:
-        id: { type: integer }
-        email: { type: string, format: email }
-        name: { type: string }
+        email:
+          type: string
+          format: email
+          description: Email пользователя (должен быть уникальным)
+          example: user@example.com
+        password:
+          type: string
+          minLength: 6
+          description: Пароль (минимум 6 символов)
+          example: securepassword123
+        name:
+          type: string
+          nullable: true
+          description: Имя пользователя
+          example: Иван Петров
 
-    MealPlan:
+    UserLogin:
       type: object
+      required: [email, password]
       properties:
-        id: { type: integer }
-        goal: { type: string }
-        calories: { type: integer }
-        budget: { type: number }
-        preferences: { type: string }
-        allergies: { type: string }
-        total_days: { type: integer, default: 7 }
+        email:
+          type: string
+          format: email
+          description: Email пользователя
+          example: user@example.com
+        password:
+          type: string
+          description: Пароль пользователя
+          example: securepassword123
 
-    Meal:
+    UserResponse:
       type: object
       properties:
-        id: { type: integer }
-        day_of_week: { type: string }
-        meal_type: { type: string }
-        dish_name: { type: string }
-        recipe: { type: string }
-        calories: { type: integer }
+        id:
+          type: integer
+          description: Уникальный идентификатор
+          example: 1
+        email:
+          type: string
+          description: Email пользователя
+          example: user@example.com
+        name:
+          type: string
+          nullable: true
+          description: Имя пользователя
+          example: Иван Петров
 
-    ShoppingItem:
+    Token:
       type: object
       properties:
-        item_name: { type: string }
-        category: { type: string }
-        quantity: { type: string }
+        access_token:
+          type: string
+          description: JWT токен для доступа к API
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        token_type:
+          type: string
+          default: bearer
+          description: Тип токена
+          example: bearer
+
+    # =========================================================================
+    # Meal Plan Schemas
+    # =========================================================================
+    
+    MealPlanCreate:
+      type: object
+      required: [goal, calories, budget]
+      properties:
+        goal:
+          type: string
+          description: Цель плана питания
+          example: похудение
+        calories:
+          type: integer
+          minimum: 1000
+          maximum: 6000
+          description: Целевое количество калорий в день
+          example: 2000
+        budget:
+          type: number
+          minimum: 0
+          description: Бюджет на неделю (руб)
+          example: 5000
+        preferences:
+          type: string
+          nullable: true
+          description: Предпочтения в еде
+          example: вегетарианское
+        allergies:
+          type: string
+          nullable: true
+          description: Аллергии и исключения
+          example: орехи, молочные продукты
+
+    MealPlanResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Уникальный идентификатор плана
+          example: 1
+        goal:
+          type: string
+          description: Цель плана
+          example: похудение
+        calories:
+          type: integer
+          description: Калорийность в день
+          example: 2000
+        budget:
+          type: number
+          description: Бюджет на неделю
+          example: 5000
+        preferences:
+          type: string
+          nullable: true
+          description: Предпочтения в еде
+          example: вегетарианское
+        allergies:
+          type: string
+          nullable: true
+          description: Аллергии
+          example: орехи
+        total_days:
+          type: integer
+          description: Количество дней в плане
+          example: 7
+        status:
+          type: string
+          description: Статус генерации (pending, generating, ready, error)
+          example: ready
+        created_at:
+          type: string
+          format: date-time
+          description: Дата создания
+        meals:
+          type: array
+          items:
+            $ref: '#/components/schemas/MealResponse'
+          description: Список блюд в плане
+
+    # =========================================================================
+    # Meal Schemas
+    # =========================================================================
+    
+    MealResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+          description: Уникальный идентификатор блюда
+          example: 1
+        day_of_week:
+          type: string
+          description: День недели
+          example: Понедельник
+        meal_type:
+          type: string
+          description: Тип приёма пищи
+          example: завтрак
+        dish_name:
+          type: string
+          description: Название блюда
+          example: Овсянка с фруктами
+        recipe:
+          type: string
+          nullable: true
+          description: Рецепт приготовления
+          example: 1. Залейте овсянку молоком...
+        calories:
+          type: integer
+          nullable: true
+          description: Калорийность порции (ккал)
+          example: 350
+        protein:
+          type: integer
+          nullable: true
+          description: Содержание белков (г)
+          example: 15
+        fat:
+          type: integer
+          nullable: true
+          description: Содержание жиров (г)
+          example: 10
+        carbs:
+          type: integer
+          nullable: true
+          description: Содержание углеводов (г)
+          example: 40
+
+    MealUpdate:
+      type: object
+      required: [dish_name]
+      properties:
+        dish_name:
+          type: string
+          description: Название блюда
+          example: Овсянка с ягодами
+        calories:
+          type: integer
+          nullable: true
+          description: Калорийность (ккал)
+          example: 350
+        protein:
+          type: integer
+          nullable: true
+          description: Белки (г)
+          example: 15
+        fat:
+          type: integer
+          nullable: true
+          description: Жиры (г)
+          example: 10
+        carbs:
+          type: integer
+          nullable: true
+          description: Углеводы (г)
+          example: 45
+        recipe:
+          type: string
+          nullable: true
+          description: Рецепт приготовления
+          example: 1. Смешайте все ингредиенты...
+
+    MealReplaceRequest:
+      type: object
+      required: [dish_name]
+      properties:
+        dish_name:
+          type: string
+          description: Название блюда для замены
+          example: Овсянка с фруктами
+        reason:
+          type: string
+          nullable: true
+          description: Причина замены
+          example: не люблю овсянку
+
+    # =========================================================================
+    # Shopping List Schemas
+    # =========================================================================
+    
+    ShoppingItemResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+          description: Уникальный идентификатор
+          example: 1
+        item_name:
+          type: string
+          nullable: true
+          description: Название продукта
+          example: Куриное филе
+        category:
+          type: string
+          nullable: true
+          description: Категория продукта
+          example: Мясо
+        quantity:
+          type: string
+          nullable: true
+          description: Количество/вес
+          example: 500 г
+        estimated_price:
+          type: number
+          nullable: true
+          description: Примерная стоимость (руб)
+          example: 250.50
+        checked:
+          type: boolean
+          default: false
+          description: Отмечен ли пункт
+          example: false
+
+    ShoppingListStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Статус генерации (pending, generating, ready, error)
+          example: ready
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShoppingItemResponse'
+          description: Список продуктов
+        total_price:
+          type: number
+          nullable: true
+          description: Общая стоимость (руб)
+          example: 3500.50
+
+    # =========================================================================
+    # LLM Schemas
+    # =========================================================================
+    
+    LLMLogResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Уникальный идентификатор запроса
+          example: 1
+        request_json:
+          type: object
+          nullable: true
+          description: Данные запроса к LLM
+        response_json:
+          type: object
+          nullable: true
+          description: Ответ от LLM
+        created_at:
+          type: string
+          format: date-time
+          description: Дата и время запроса
+
+    # =========================================================================
+    # Common Schemas
+    # =========================================================================
+    
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Статус операции
+          example: ok
 
     ErrorResponse:
       type: object
       properties:
-        error: { type: string }
-        message: { type: string }
+        error:
+          type: string
+          description: Тип ошибки
+          example: Bad Request
+        message:
+          type: string
+          description: Подробное сообщение об ошибке
+          example: Email уже зарегистрирован
+
+    PlanStatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Статус генерации плана
+          example: generating
+        is_generating:
+          type: boolean
+          description: Идёт ли генерация прямо сейчас
+          example: true
 
 paths:
-  /auth/google:
+  # ===========================================================================
+  # Health
+  # ===========================================================================
+  /health:
     get:
-      summary: Авторизация через Google OAuth
+      tags: ["🏥 Система"]
+      summary: Проверка работоспособности
+      description: Проверяет, что API работает и доступен. Не требует авторизации.
+      security: []
       responses:
-        "302":
-          description: Redirect на Google OAuth
-        "500":
-          description: Ошибка сервера
+        '200':
+          description: API работает нормально
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
 
+  # ===========================================================================
+  # Auth
+  # ===========================================================================
+  /auth/register:
+    post:
+      tags: ["🔐 Аутентификация"]
+      summary: Регистрация нового пользователя
+      description: Создаёт новую учётную запись с проверкой уникальности email.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: Пользователь успешно создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          description: Email уже зарегистрирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации данных
+
+  /auth/login:
+    post:
+      tags: ["🔐 Аутентификация"]
+      summary: Вход в систему
+      description: Аутентификация и получение JWT токена для доступа к API.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: Успешная аутентификация
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+        '401':
+          description: Неверные учётные данные
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации данных
+
+  # ===========================================================================
+  # Plans
+  # ===========================================================================
   /plans:
     get:
+      tags: ["📋 Планы питания"]
       summary: Получить все планы пользователя
-      security:
-        - bearerAuth: []
+      description: Возвращает список всех планов с блюдами, отсортированных по дате (новые первыми).
       responses:
-        "200":
-          description: Список планов
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/MealPlan" }
-
-    post:
-      summary: Создать новый план питания
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [goal, calories, budget]
-              properties:
-                goal: { type: string }
-                calories: { type: integer, minimum: 1000, maximum: 6000 }
-                budget: { type: number, minimum: 0 }
-                preferences: { type: string }
-                allergies: { type: string }
-      responses:
-        "201":
-          description: План создан
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/MealPlan" }
-        "400":
-          description: Неверные данные
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
-  /plans/{plan_id}:
-    get:
-      summary: Получить детали плана
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: plan_id
-          in: path
-          required: true
-          schema: { type: integer }
-      responses:
-        "200":
-          description: Детали плана
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/MealPlan" }
-        "404":
-          description: План не найден
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
-    delete:
-      summary: Удалить план
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: plan_id
-          in: path
-          required: true
-          schema: { type: integer }
-      responses:
-        "204":
-          description: План удалён
-        "404":
-          description: План не найден
-
-  /meals/{plan_id}/replace:
-    post:
-      summary: Заменить блюдо в плане через LLM
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: plan_id
-          in: path
-          required: true
-          schema: { type: integer }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [dish_name]
-              properties:
-                dish_name: { type: string }
-                reason: { type: string }
-      responses:
-        "200":
-          description: Альтернативные блюда
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/Meal" }
-        "400":
-          description: Неверный запрос
-          content:
-            application/json:
-              schema: { $ref: "#/components/schemas/ErrorResponse" }
-
-  /meals/{plan_id}/shopping-list:
-    get:
-      summary: Получить список покупок
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: plan_id
-          in: path
-          required: true
-          schema: { type: integer }
-      responses:
-        "200":
-          description: Список покупок
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { $ref: "#/components/schemas/ShoppingItem" }
-
-  /llm/logs:
-    get:
-      summary: Получить историю обращений к LLM
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: История запросов
+        '200':
+          description: Список планов питания
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    id: { type: integer }
-                    request_json: { type: object }
-                    response_json: { type: object }
-                    created_at: { type: string, format: date-time }
+                  $ref: '#/components/schemas/MealPlanResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags: ["📋 Планы питания"]
+      summary: Создать новый план питания
+      description: Создаёт план и запускает его генерацию через LLM в фоновом режиме.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealPlanCreate'
+      responses:
+        '201':
+          description: План создан, генерация запущена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealPlanResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации данных
+
+  /plans/{plan_id}:
+    get:
+      tags: ["📋 Планы питания"]
+      summary: Получить детали плана
+      description: Возвращает детальную информацию о плане со списком всех блюд.
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID плана питания
+      responses:
+        '200':
+          description: Детали плана с блюдами
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealPlanResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: План не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: ["📋 Планы питания"]
+      summary: Удалить план
+      description: Полностью удаляет план со всеми блюдами и списком покупок.
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID плана для удаления
+      responses:
+        '204':
+          description: План успешно удалён
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: План не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /plans/{plan_id}/status:
+    get:
+      tags: ["📋 Планы питания"]
+      summary: Проверить статус генерации плана
+      description: Возвращает текущий статус генерации и флаг активности.
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID плана питания
+      responses:
+        '200':
+          description: Статус генерации
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanStatusResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: План не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /plans/{plan_id}/regenerate:
+    post:
+      tags: ["📋 Планы питания"]
+      summary: Перегенерировать план
+      description: Удаляет все блюда и запускает повторную генерацию через LLM.
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID плана для перегенерации
+      responses:
+        '200':
+          description: Перегенерация запущена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealPlanResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: План не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Генерация уже в процессе
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ===========================================================================
+  # Meals
+  # ===========================================================================
+  /meals/{plan_id}/replace:
+    post:
+      tags: ["🍽️ Блюда и покупки"]
+      summary: Заменить блюдо в плане
+      description: Использует LLM для подбора альтернативных блюд на замену указанному.
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID плана питания
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealReplaceRequest'
+      responses:
+        '200':
+          description: Список альтернативных блюд
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MealResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: План не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Замена уже выполняется
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /meals/{plan_id}/shopping-list:
+    get:
+      tags: ["🍽️ Блюда и покупки"]
+      summary: Получить список покупок
+      description: Возвращает список покупок с текущим статусом (ready, generating, pending).
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID плана питания
+      responses:
+        '200':
+          description: Статус и список покупок
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShoppingListStatusResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: План не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /meals/{plan_id}/shopping-list/generate:
+    post:
+      tags: ["🍽️ Блюда и покупки"]
+      summary: Сгенерировать список покупок
+      description: Запускает генерацию списка покупок через LLM на основе блюд плана.
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID плана питания
+      responses:
+        '200':
+          description: Список сгенерирован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShoppingListStatusResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: План не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Генерация уже выполняется
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /meals/{meal_id}:
+    patch:
+      tags: ["🍽️ Блюда и покупки"]
+      summary: Обновить блюдо
+      description: Обновляет данные конкретного блюда (например, после выбора альтернативы).
+      parameters:
+        - name: meal_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID блюда для обновления
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MealUpdate'
+      responses:
+        '200':
+          description: Блюдо обновлено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MealResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Блюдо не найдено
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Ошибка валидации данных
+
+  /meals/{plan_id}/shopping-list:
+    delete:
+      tags: ["🍽️ Блюда и покупки"]
+      summary: Очистить список покупок
+      description: Удаляет весь список покупок для перегенерации.
+      parameters:
+        - name: plan_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: ID плана питания
+      responses:
+        '200':
+          description: Список очищен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: План не найден
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # ===========================================================================
+  # LLM Logs
+  # ===========================================================================
+  /llm/logs:
+    get:
+      tags: ["🤖 LLM Логи"]
+      summary: Получить историю обращений к LLM
+      description: Возвращает последние 50 запросов к LLM для отладки.
+      responses:
+        '200':
+          description: Список логов обращений к LLM
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LLMLogResponse'
+        '401':
+          description: Не авторизован
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
